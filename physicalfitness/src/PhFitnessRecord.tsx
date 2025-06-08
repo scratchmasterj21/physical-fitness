@@ -25,7 +25,7 @@ const PhFitnessRecord: React.FC = () => {
   const [currentStudentIndex, setCurrentStudentIndex] = useState<number | null>(null);
   const [schoolYears, setSchoolYears] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
-  const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>('2024');
+  const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedGrade, setSelectedGrade] = useState<string>('G1A');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
