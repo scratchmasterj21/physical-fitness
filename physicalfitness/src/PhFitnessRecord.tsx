@@ -85,9 +85,9 @@ const PhFitnessRecord: React.FC = () => {
   // Keep the existing effect for when school year or grade changes
   useEffect(() => {
     if (prevSchoolYear.current !== selectedSchoolYear || prevGrade.current !== selectedGrade) {
-      const db = getDatabase(app);
+    const db = getDatabase(app);
       const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
-      
+  
       onValue(studentsRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
@@ -103,7 +103,7 @@ const PhFitnessRecord: React.FC = () => {
           setStudents([]);
         }
       });
-
+  
       prevSchoolYear.current = selectedSchoolYear;
       prevGrade.current = selectedGrade;
     }
@@ -939,15 +939,15 @@ const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, type: str
 
 const saveCurrentStudent = async () => {
   if (!hasUnsavedChanges || currentStudentIndex === null) return;
-  
+
   setIsSaving(true);
   const db = getDatabase(app);
   const studentRef = ref(db, `${selectedSchoolYear}/${selectedGrade}/student${currentStudentIndex + 1}`);
   
   try {
     await update(studentRef, {
-      '1sttry': students[currentStudentIndex]['1sttry'],
-      '2ndtry': students[currentStudentIndex]['2ndtry'],
+    '1sttry': students[currentStudentIndex]['1sttry'],
+    '2ndtry': students[currentStudentIndex]['2ndtry'],
     });
     setHasUnsavedChanges(false);
     setLastSavedTime(new Date());
@@ -1138,14 +1138,14 @@ const renderStudentList = () => (
             className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
             onClick={() => exportGradeToIndividualWorkbooks(students, selectedGrade)}
           >
-            Export to Zip
+          Export to Zip
           </button>
           <button 
             className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
             onClick={() => exportGradeToSingleWorkbook(students, selectedGrade)}
           >
             Export to Excel
-          </button>
+              </button>
           {hasUnsavedChanges && currentStudentIndex !== null && (
             <button 
               className="btn btn-primary bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
@@ -1153,9 +1153,9 @@ const renderStudentList = () => (
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : 'Save All Changes'}
-            </button>
-          )}
-        </div>
+              </button>
+              )}      
+            </div>
       </div>
 
       <div className="flex-grow">
@@ -1173,10 +1173,10 @@ const renderStudentList = () => (
               </button>
               {currentStudentIndex !== null && students[currentStudentIndex] && (
                 <>
-                  <span className="font-bold text-lg mr-5">Grade: {students[currentStudentIndex].class.slice(0,2)}</span>
-                  <span className="font-bold text-lg mr-5">Class: {students[currentStudentIndex].class.slice(2)}</span>
-                  <span className="font-bold text-lg mr-5">Gender: {students[currentStudentIndex].gender}</span>
-                  <span className="font-bold text-lg mr-5">{currentStudentIndex + 1} {students[currentStudentIndex].enname}</span>
+              <span className="font-bold text-lg mr-5">Grade: {students[currentStudentIndex].class.slice(0,2)}</span>
+              <span className="font-bold text-lg mr-5">Class: {students[currentStudentIndex].class.slice(2)}</span>
+              <span className="font-bold text-lg mr-5">Gender: {students[currentStudentIndex].gender}</span>
+              <span className="font-bold text-lg mr-5">{currentStudentIndex + 1} {students[currentStudentIndex].enname}</span>
                 </>
               )}
               {hasUnsavedChanges && (
@@ -1193,17 +1193,17 @@ const renderStudentList = () => (
             <div className="flex justify-center">
               {currentStudentIndex !== null && students[currentStudentIndex] && (
                 <table className="min-w-fit divide-y divide-gray-200 border border-slate-400 justify-center">
-                  <thead className="bg-gray-50">
-                    <tr>
+                <thead className="bg-gray-50">
+                  <tr>
                       <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
                       <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Record</th>
                       <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
                     {renderEditView(students[currentStudentIndex])}
-                  </tbody>
-                </table>
+                </tbody>
+              </table>
               )}
             </div>
           </div>
