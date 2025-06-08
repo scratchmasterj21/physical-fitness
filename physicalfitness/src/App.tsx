@@ -1,11 +1,26 @@
 import './App.css'
 import PhFitnessRecord from './PhFitnessRecord'
+import CsvUpload from './CsvUpload'
+import { useState, useEffect } from 'react'
 
 function App() {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
-  return (
- <PhFitnessRecord/>
-);
+  useEffect(() => {
+    const handlePathChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handlePathChange);
+    return () => window.removeEventListener('popstate', handlePathChange);
+  }, []);
+
+  // Simple routing based on pathname
+  if (currentPath === '/csv-upload') {
+    return <CsvUpload />;
+  }
+
+  return <PhFitnessRecord />;
 }
 
 export default App

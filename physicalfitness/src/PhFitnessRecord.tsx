@@ -22,22 +22,28 @@ interface ComponentOrder {
 
 const PhFitnessRecord: React.FC = () => {
   const [students, setStudents] = useState<Student[]>([]);
-  const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
+  const [currentStudentIndex, setCurrentStudentIndex] = useState<number | null>(null);
   const [schoolYears, setSchoolYears] = useState<string[]>([]);
   const [grades, setGrades] = useState<string[]>([]);
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>('2024');
   const [selectedGrade, setSelectedGrade] = useState<string>('G1A');
-  const [editable, setEditable] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const firstInputRef = useRef<HTMLInputElement>(null);
 
-  const toggleEdit = () => {
-    setEditable(!editable);
-  };
+  const prevSchoolYear = useRef<string>(selectedSchoolYear);
+  const prevGrade = useRef<string>(selectedGrade);
 
+  // Add initial load effect
   useEffect(() => {
     const db = getDatabase(app);
     const yearRef = ref(db, 'schoolyear');
     const gradeRef = ref(db, 'grade');
+    const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
 
+    // Load school years
     onValue(yearRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
@@ -45,23 +51,44 @@ const PhFitnessRecord: React.FC = () => {
       }
     });
 
+    // Load grades
     onValue(gradeRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         setGrades(Object.values(data));
       }
     });
-  }, []);
 
-  const prevSchoolYear = useRef(selectedSchoolYear);
-const prevGrade = useRef(selectedGrade);
+    // Load initial students
+    onValue(studentsRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const sortedStudents = Object.entries(data)
+          .sort(([key1], [key2]) => {
+            const num1 = parseInt(key1.match(/\d+$/)?.[0] || '0', 10);
+            const num2 = parseInt(key2.match(/\d+$/)?.[0] || '0', 10);
+            return num1 - num2;
+          })
+          .map(([, studentData]) => studentData as Student);
+        setStudents(sortedStudents);
+      } else {
+        setStudents([]);
+      }
+    });
 
+    // Cleanup function
+    return () => {
+      // No need to manually unsubscribe as onValue handles cleanup
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Keep the existing effect for when school year or grade changes
   useEffect(() => {
-    const db = getDatabase(app);
-    if (selectedSchoolYear && selectedGrade) {
-      const studentRef = query(ref(db, `${selectedSchoolYear}/${selectedGrade}`), orderByKey());
-  
-      const unsubscribe = onValue(studentRef, (snapshot) => {
+    if (prevSchoolYear.current !== selectedSchoolYear || prevGrade.current !== selectedGrade) {
+      const db = getDatabase(app);
+      const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
+      
+      onValue(studentsRef, (snapshot) => {
         const data = snapshot.val();
         if (data) {
           const sortedStudents = Object.entries(data)
@@ -72,32 +99,38 @@ const prevGrade = useRef(selectedGrade);
             })
             .map(([, studentData]) => studentData as Student);
           setStudents(sortedStudents);
-        // Check if the school year or grade has changed from the previous values
-        if (selectedSchoolYear !== prevSchoolYear.current || selectedGrade !== prevGrade.current) {
-          setCurrentStudentIndex(0);
-          prevSchoolYear.current = selectedSchoolYear;
-          prevGrade.current = selectedGrade;
-        }
-
-          // Potentially update current student index here only if needed
         } else {
           setStudents([]);
-          setCurrentStudentIndex(0);
         }
       });
-  
-      return () => unsubscribe(); // This will detach the listener when the component unmounts or dependencies change
+
+      prevSchoolYear.current = selectedSchoolYear;
+      prevGrade.current = selectedGrade;
     }
   }, [selectedSchoolYear, selectedGrade]);
 
+  // Add keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      if (currentStudentIndex === null) return;
+      
+      if (event.key === 'ArrowLeft' && currentStudentIndex > 0) {
+        handleStudentSelect(currentStudentIndex - 1);
+      } else if (event.key === 'ArrowRight' && currentStudentIndex < students.length - 1) {
+        handleStudentSelect(currentStudentIndex + 1);
+      }
+    };
 
-  const handlePrevious = () => {
-    setCurrentStudentIndex(prev => (prev > 0 ? prev - 1 : prev));
-  };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentStudentIndex, students.length]);
 
-  const handleNext = () => {
-    setCurrentStudentIndex(prev => (prev < students.length - 1 ? prev + 1 : prev));
-  };
+  // Auto-focus first input when student changes
+  useEffect(() => {
+    if (firstInputRef.current) {
+      firstInputRef.current.focus();
+    }
+  }, [currentStudentIndex]);
 
   const exportGradeToIndividualWorkbooks = async (students: Student[], selectedGrade: string) => {
     const zip = new JSZip(); // Create a new instance of JSZip
@@ -776,7 +809,7 @@ const determineGrade = (totalScore: number, gradeLevel: string): string => {
       return String.fromCharCode(65 + i); // Converts 0 -> 'A', 1 -> 'B', etc.
     }
   }
-  return 'E'; // Default to 'E' if no other grade is matched
+  return 'F'; // Return 'F' if no threshold is met
 };
 
 const componentOrder: ComponentOrder = {
@@ -790,7 +823,7 @@ const componentOrder: ComponentOrder = {
   "softballthrowing": "Softball Throwing"
 };
 
-const renderGripStrength = (student: Student, isEdit: boolean) => {
+const renderGripStrength = (student: Student) => {
   const maxGripStrength = Math.max(
       student['1sttry']['gripstrR'], student['2ndtry']['gripstrR'],
       student['1sttry']['gripstrL'], student['2ndtry']['gripstrL']
@@ -801,26 +834,72 @@ const renderGripStrength = (student: Student, isEdit: boolean) => {
     <tr key="Grip Strength">
       <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Grip Strength</td>
       <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {isEdit ? (
-          <>
-            <strong>R: 1:</strong> <input className="text-center w-12 border border-slate-400" type="text" value={student['1sttry']['gripstrR']} onChange={(e) => handleInputChange(e, 'gripstrR', '1sttry')} /> kg,
-               <strong> 2:</strong> <input className="text-center w-12 border border-slate-400" type="text" value={student['2ndtry']['gripstrR']} onChange={(e) => handleInputChange(e, 'gripstrR', '2ndtry')} /> kg
-            <br/> <br/>
-            <strong>L: 1:</strong> <input className="text-center w-12 border border-slate-400" type="text" value={student['1sttry']['gripstrL']} onChange={(e) => handleInputChange(e, 'gripstrL', '1sttry')} /> kg,
-               <strong> 2:</strong> <input className="text-center w-12 border border-slate-400" type="text" value={student['2ndtry']['gripstrL']} onChange={(e) => handleInputChange(e, 'gripstrL', '2ndtry')} /> kg
-            <br/> <br/>
+        <div className="space-y-2">
+          <div>
+            <strong>R: 1:</strong>
+            <input
+              ref={firstInputRef}
+              className="text-center w-16 border border-slate-400 rounded px-1 mx-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              type="number"
+              value={student['1sttry']['gripstrR']}
+              onChange={(e) => handleInputChange(e, 'gripstrR', '1sttry')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const nextInput = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+                  if (nextInput) nextInput.focus();
+                }
+              }}
+            />
+            kg
+            <strong className="ml-2">2:</strong>
+            <input
+              className="text-center w-16 border border-slate-400 rounded px-1 mx-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              type="number"
+              value={student['2ndtry']['gripstrR']}
+              onChange={(e) => handleInputChange(e, 'gripstrR', '2ndtry')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const nextInput = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+                  if (nextInput) nextInput.focus();
+                }
+              }}
+            />
+            kg
+          </div>
+          <div>
+            <strong>L: 1:</strong>
+            <input
+              className="text-center w-16 border border-slate-400 rounded px-1 mx-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              type="number"
+              value={student['1sttry']['gripstrL']}
+              onChange={(e) => handleInputChange(e, 'gripstrL', '1sttry')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const nextInput = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+                  if (nextInput) nextInput.focus();
+                }
+              }}
+            />
+            kg
+            <strong className="ml-2">2:</strong>
+            <input
+              className="text-center w-16 border border-slate-400 rounded px-1 mx-1 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              type="number"
+              value={student['2ndtry']['gripstrL']}
+              onChange={(e) => handleInputChange(e, 'gripstrL', '2ndtry')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const nextInput = e.currentTarget.parentElement?.nextElementSibling?.querySelector('input');
+                  if (nextInput) nextInput.focus();
+                }
+              }}
+            />
+            kg
+          </div>
+          <div>
             <strong>Avg:</strong> {maxGripStrength} kg
-
-          </>
-        ) : (
-          <>
-            <strong>R: 1:</strong> {student['1sttry']['gripstrR']} kg, <strong>2:</strong> {student['2ndtry']['gripstrR']} kg
-            <br/>
-            <strong>L: 1:</strong> {student['1sttry']['gripstrL']} kg, <strong>2:</strong> {student['2ndtry']['gripstrL']} kg
-            <br/>
-            <strong>Avg:</strong> {maxGripStrength} kg
-          </>
-        )}
+          </div>
+        </div>
       </td>
       <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{score}</td>
     </tr>
@@ -832,7 +911,7 @@ const renderDataView = (student: Student) => {
   const componentRows = [];
 
   // Render Grip Strength first
-  const gripStrengthRow = renderGripStrength(student, false);
+  const gripStrengthRow = renderGripStrength(student);
   totalScore += gripStrengthRow.props.children[2].props.children; // Assuming score is the third child
 
   // Process other components
@@ -900,6 +979,8 @@ function getUnitForComponent(component: string) {
 }
 
 const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, type: string, tryNumber: '1sttry' | '2ndtry') => {
+  if (currentStudentIndex === null) return;
+  
   const updatedStudents = students.map((student, index) => {
     if (index === currentStudentIndex) {
       return { 
@@ -910,26 +991,64 @@ const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, type: str
     return student;
   });
   setStudents(updatedStudents);
+  setHasUnsavedChanges(true);
 };
 
-const saveEdits = () => {
-
+const saveCurrentStudent = async () => {
+  if (!hasUnsavedChanges || currentStudentIndex === null) return;
+  
+  setIsSaving(true);
   const db = getDatabase(app);
   const studentRef = ref(db, `${selectedSchoolYear}/${selectedGrade}/student${currentStudentIndex + 1}`);
-  update(studentRef, {
-    '1sttry': students[currentStudentIndex]['1sttry'],
-    '2ndtry': students[currentStudentIndex]['2ndtry'],
-  }).then(() => {
-    toggleEdit(); // Toggle back to view mode after save
-  });
+  
+  try {
+    await update(studentRef, {
+      '1sttry': students[currentStudentIndex]['1sttry'],
+      '2ndtry': students[currentStudentIndex]['2ndtry'],
+    });
+    setHasUnsavedChanges(false);
+    setLastSavedTime(new Date());
+  } catch (error) {
+    console.error('Error saving student data:', error);
+    // You might want to show an error message to the user here
+  } finally {
+    setIsSaving(false);
+  }
+};
+
+const saveAllChanges = async () => {
+  if (!hasUnsavedChanges) return;
+  
+  setIsSaving(true);
+  const db = getDatabase(app);
+  
+  try {
+    const updates = students.reduce((acc, student, index) => {
+      acc[`${selectedSchoolYear}/${selectedGrade}/student${index + 1}`] = {
+        '1sttry': student['1sttry'],
+        '2ndtry': student['2ndtry'],
+      };
+      return acc;
+    }, {} as Record<string, any>);
+    
+    await update(ref(db), updates);
+    setHasUnsavedChanges(false);
+  } catch (error) {
+    console.error('Error saving all student data:', error);
+    // You might want to show an error message to the user here
+  } finally {
+    setIsSaving(false);
+  }
 };
 
 const renderEditView = (student: Student) => {
+  if (!student) return null;
+  
   let totalScore = 0;
   const componentRows = [
-    renderGripStrength(student, true)
+    renderGripStrength(student)
   ];
-  totalScore += renderGripStrength(student, true).props.children[2].props.children; // Assuming score is the third child
+  totalScore += renderGripStrength(student).props.children[2].props.children;
 
   Object.keys(componentOrder).forEach((component) => {
     if (component !== "gripStrength") {
@@ -974,15 +1093,71 @@ const renderEditView = (student: Student) => {
     </tr>
   );
 
-  return (
-    <>
-      {componentRows}
-    </>
-  );
+  return componentRows;
 };
 
+const handleStudentSelect = async (index: number) => {
+  if (hasUnsavedChanges && currentStudentIndex !== null) {
+    await saveCurrentStudent();
+  }
+  setCurrentStudentIndex(index);
+};
 
-  
+const handleBackToList = async () => {
+  if (hasUnsavedChanges && currentStudentIndex !== null) {
+    await saveCurrentStudent();
+  }
+  setCurrentStudentIndex(null);
+};
+
+const filteredStudents = students.filter(student => 
+  student.enname.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  student.jpname.toLowerCase().includes(searchTerm.toLowerCase())
+);
+
+const renderStudentList = () => (
+  <div className="mt-28 p-4">
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Search by name..."
+          className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No.</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">English Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Japanese Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredStudents.map((student, index) => (
+              <tr 
+                key={index}
+                onClick={() => handleStudentSelect(index)}
+                className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+              >
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.enname}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.jpname}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.gender}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{student.class}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+);
 
   return (
     <div className="h-screen flex flex-col">
@@ -1015,52 +1190,79 @@ const renderEditView = (student: Student) => {
           </div>
 
         </div>
-        <div className="mt-5">
-          <button className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full mr-5" onClick={() => exportGradeToIndividualWorkbooks(students, selectedGrade)}>
-          Export to Zip
+        <div className="mt-5 flex justify-center items-center space-x-4">
+          <button 
+            className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
+            onClick={() => exportGradeToIndividualWorkbooks(students, selectedGrade)}
+          >
+            Export to Zip
           </button>
-          <button className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full" onClick={() => exportGradeToSingleWorkbook(students, selectedGrade)}>Export to Excel</button>
-          </div>
+          <button 
+            className="btn btn-primary bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
+            onClick={() => exportGradeToSingleWorkbook(students, selectedGrade)}
+          >
+            Export to Excel
+          </button>
+          {hasUnsavedChanges && currentStudentIndex !== null && (
+            <button 
+              className="btn btn-primary bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
+              onClick={saveAllChanges}
+              disabled={isSaving}
+            >
+              {isSaving ? 'Saving...' : 'Save All Changes'}
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex-grow p-4">
-        {students.length > 0 && (
-          <div>
-            <div className="flex justify-center items-center mt-28">
-              <button type="button" className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full" onClick={editable ? saveEdits : toggleEdit}>
-                {editable ? 'Save' : 'Edit'}
-              </button>
-              {editable && (
-              <button type="button" onClick={toggleEdit} className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full ml-5">
-              Cancel
-              </button>
-              )}      
-            </div>
-            <div className="flex justify-center items-center mb-4 ">
-              <button onClick={handlePrevious} className="text-white bg-red-500 hover:bg-red-600 font-bold py-2 px-4 rounded mr-5">Prev</button>
-              <span className="font-bold text-lg mr-5">Grade: {students[currentStudentIndex].class.slice(0,2)}</span>
-              <span className="font-bold text-lg mr-5">Class: {students[currentStudentIndex].class.slice(2)}</span>
-              <span className="font-bold text-lg mr-5">Gender: {students[currentStudentIndex].gender}</span>
 
-              <span className="font-bold text-lg mr-5">{currentStudentIndex + 1} {students[currentStudentIndex].enname}</span>
-              <button onClick={handleNext} className="text-white bg-blue-500 hover:bg-blue-600 font-bold py-2 px-4 rounded">Next</button>
+      <div className="flex-grow">
+        {currentStudentIndex === null ? (
+          renderStudentList()
+        ) : (
+          <div className="p-4">
+            <div className="flex justify-center items-center mt-28 mb-4">
+              <button 
+                onClick={handleBackToList}
+                className="text-white bg-gray-500 hover:bg-gray-600 font-bold py-2 px-4 rounded mr-5 transition-colors duration-200"
+                disabled={isSaving}
+              >
+                ← Back to List
+              </button>
+              {currentStudentIndex !== null && students[currentStudentIndex] && (
+                <>
+                  <span className="font-bold text-lg mr-5">Grade: {students[currentStudentIndex].class.slice(0,2)}</span>
+                  <span className="font-bold text-lg mr-5">Class: {students[currentStudentIndex].class.slice(2)}</span>
+                  <span className="font-bold text-lg mr-5">Gender: {students[currentStudentIndex].gender}</span>
+                  <span className="font-bold text-lg mr-5">{currentStudentIndex + 1} {students[currentStudentIndex].enname}</span>
+                </>
+              )}
+              {hasUnsavedChanges && (
+                <span className="ml-4 text-yellow-600">
+                  * Unsaved changes
+                </span>
+              )}
+              {lastSavedTime && !hasUnsavedChanges && (
+                <span className="ml-4 text-green-600">
+                  Last saved: {lastSavedTime.toLocaleTimeString()}
+                </span>
+              )}
             </div>
             <div className="flex justify-center">
-              <table className="min-w-fit divide-y divide-gray-200 border border-slate-400 justify-center ">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="border border-slate-400 text-center px-6 py-3  text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
-                    <th className="border border-slate-400 text-center px-6 py-3  text-xs font-medium text-gray-500 uppercase tracking-wider">Record</th>
-                    <th className="border border-slate-400 text-center px-6 py-3  text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                {editable ? renderEditView(students[currentStudentIndex]) : renderDataView(students[currentStudentIndex])}
-  
-                </tbody>
-
-              </table>
+              {currentStudentIndex !== null && students[currentStudentIndex] && (
+                <table className="min-w-fit divide-y divide-gray-200 border border-slate-400 justify-center">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
+                      <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Record</th>
+                      <th className="border border-slate-400 text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {renderEditView(students[currentStudentIndex])}
+                  </tbody>
+                </table>
+              )}
             </div>
-
           </div>
         )}
       </div>
