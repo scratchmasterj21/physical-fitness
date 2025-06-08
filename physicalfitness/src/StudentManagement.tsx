@@ -46,7 +46,7 @@ const StudentManagement: React.FC = () => {
   const [selectedSchoolYear, setSelectedSchoolYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedGrade, setSelectedGrade] = useState<string>('');
   const [students, setStudents] = useState<{ key: string, student: Student }[]>([]);
-  const [newYear, setNewYear] = useState('');
+
 
   useEffect(() => {
     const db = getDatabase(app);
@@ -103,11 +103,6 @@ const StudentManagement: React.FC = () => {
     }
   }, [selectedSchoolYear, selectedGrade, grades]);
 
-  const sortedStudents = [...students].sort((a, b) => {
-    const numA = parseInt(a.key.match(/\d+$/)?.[0] || '0', 10);
-    const numB = parseInt(b.key.match(/\d+$/)?.[0] || '0', 10);
-    return numA - numB;
-  });
 
   return (
     <div className="min-h-screen bg-gray-100 p-8">
