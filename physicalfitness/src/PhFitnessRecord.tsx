@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getDatabase, ref, onValue, query, orderByKey, update } from 'firebase/database';
+import { getDatabase, ref, onValue, update } from 'firebase/database';
 import app from './FirebaseConfig';
 import JSZip from 'jszip';
 import ExcelJS from 'exceljs';
@@ -906,63 +906,6 @@ const renderGripStrength = (student: Student) => {
   );
 };
 
-const renderDataView = (student: Student) => {
-  let totalScore = 0;
-  const componentRows = [];
-
-  // Render Grip Strength first
-  const gripStrengthRow = renderGripStrength(student);
-  totalScore += gripStrengthRow.props.children[2].props.children; // Assuming score is the third child
-
-  // Process other components
-  Object.keys(componentOrder).forEach((component) => {
-      if (component !== "gripStrength") {
-          const firstTry = student['1sttry'][component];
-          const secondTry = student['2ndtry'][component] ?? firstTry; // use firstTry if secondTry is undefined
-          const score = calculateScore(component, student.gender, firstTry, secondTry);
-          totalScore += score;
-          let displayRecord;
-          if (component === 'situps' || component === '20mshuttleruns' || component === '50msprint' ) {
-              displayRecord = `${firstTry} ${component === '50msprint' ? 'seconds' : 'times'}`;
-          } else {
-              displayRecord = (
-                <>
-                  <strong>1:</strong> {firstTry} {getUnitForComponent(component)}, <strong>2:</strong> {secondTry} {getUnitForComponent(component)}
-                </>
-              );
-          }
-          
-          componentRows.push(
-              <tr key={component}>
-                  <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{componentOrder[component]}</td>
-                  <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{displayRecord}</td>
-
-                  <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{score}</td>
-              </tr>
-          );
-      }
-  });
-
-  // Append Grip Strength to the rows
-  componentRows.unshift(gripStrengthRow);
-  const grade = determineGrade(totalScore, student.class);
-  // Append Total Score Row
-  componentRows.push(
-      <tr key="totalScore">
-          <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={2}>Total Score</td>
-          <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{totalScore}</td>
-      </tr>
-  );
-
-  componentRows.push(
-    <tr key="grade">
-        <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900" colSpan={2}>Grade</td>
-        <td className="border border-slate-400 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{grade}</td>
-    </tr>
-);
-
-  return componentRows;
-};
 
 function getUnitForComponent(component: string) {
   switch (component) {
