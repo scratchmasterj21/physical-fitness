@@ -809,7 +809,7 @@ const determineGrade = (totalScore: number, gradeLevel: string): string => {
       return String.fromCharCode(65 + i); // Converts 0 -> 'A', 1 -> 'B', etc.
     }
   }
-  return 'F'; // Return 'F' if no threshold is met
+  return 'E'; // Return 'F' if no threshold is met
 };
 
 const componentOrder: ComponentOrder = {
