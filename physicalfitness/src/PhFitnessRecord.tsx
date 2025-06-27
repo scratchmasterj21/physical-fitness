@@ -132,7 +132,7 @@ const PhFitnessRecord: React.FC = () => {
     }
   }, [currentStudentIndex]);
 
-  const exportGradeToIndividualWorkbooks = async (students: Student[], selectedGrade: string) => {
+const exportGradeToIndividualWorkbooks = async (students: Student[], selectedGrade: string) => {
     const zip = new JSZip(); // Create a new instance of JSZip
     let i = 1;
     for (const student of students) {
@@ -168,6 +168,31 @@ const PhFitnessRecord: React.FC = () => {
           right: { style: 'thin' as 'thin' }   // Explicitly typed as 'thin'
       }
   };
+
+  // Create a left-aligned version of dataStyle for columns C and I
+  const leftAlignedDataStyle: Partial<ExcelJS.Style> = {
+    font: { size: 14 },
+    alignment: {
+        horizontal: 'left' as 'left',      // Left aligned instead of center
+        vertical: 'middle' as 'middle',
+        wrapText: true
+    },
+    border: {
+        top: { style: 'thin' as 'thin' },
+        left: { style: 'thin' as 'thin' },
+        bottom: { style: 'thin' as 'thin' },
+        right: { style: 'thin' as 'thin' }
+    }
+  };
+
+  // Helper function to apply style based on column
+  function applyStyleToCell(cell: ExcelJS.Cell, colNumber: number) {
+    if (colNumber === 6 || colNumber === 9) { // Column C = 3, Column I = 9
+      cell.style = leftAlignedDataStyle;
+    } else {
+      cell.style = dataStyle;
+    }
+  }
 
       // Header row
       const headerRow = worksheet.getCell('A2');
@@ -205,8 +230,9 @@ const PhFitnessRecord: React.FC = () => {
 
       // Column headers
       worksheet.addRow(['', '', '']);
-      worksheet.addRow(['Component', '', 'Record', '','','','','','','Score']).eachCell((cell) => {
-          cell.style = dataStyle;
+      const columnHeaderRow = worksheet.addRow(['Component', '', 'Record', '','','','','','','Score']);
+      columnHeaderRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
 
       worksheet.mergeCells(`A4:B4`);
@@ -225,15 +251,21 @@ const PhFitnessRecord: React.FC = () => {
               const score = calculateScore("gripStrength", student.gender, maxGripStrength, 0);
               totalScore += score;
 
-              worksheet.addRow(['Grip Strength','','R', '1:', `${firstTryR}`, 'kg', '2:',`${secondTryR}`, 'kg', score]).eachCell((cell) => {
-                  cell.style = dataStyle;
+              const gripRow1 = worksheet.addRow(['Grip Strength','','R', '1:', `${firstTryR}`, 'kg', '2:',`${secondTryR}`, 'kg', score]);
+              gripRow1.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
-              worksheet.addRow(['Grip Strength','','L', '1:', `${firstTryL}`, 'kg', '2:',`${secondTryL}`, 'kg', score]).eachCell((cell) => {
-                  cell.style = dataStyle;
+
+              const gripRow2 = worksheet.addRow(['Grip Strength','','L', '1:', `${firstTryL}`, 'kg', '2:',`${secondTryL}`, 'kg', score]);
+              gripRow2.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
-              worksheet.addRow(['','','Avg: ', `${maxGripStrength}`,'','','','','kg', '']).eachCell((cell) => {
-                  cell.style = dataStyle;
+
+              const gripRow3 = worksheet.addRow(['','','Avg: ', `${maxGripStrength}`,'','','','','kg', '']);
+              gripRow3.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
+
               worksheet.mergeCells(`A5:B7`);
               worksheet.mergeCells(`D7:H7`);
               worksheet.mergeCells(`J5:J7`);
@@ -246,29 +278,32 @@ const PhFitnessRecord: React.FC = () => {
 
 
               if (key === 'situps') {
-
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', '', `${getUnitForComponent(key)}`, score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A8:B8`);
                 worksheet.mergeCells(`C8:H8`);
               }
               if (key === '50msprint') {
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', `${getUnitForComponent(key)}`, '', score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A12:B12`);
                 worksheet.mergeCells(`C12:G12`);
                 worksheet.mergeCells(`H12:I12`);
+                
+                // Apply left alignment to the merged H12:I12 cell
+                const mergedCell = worksheet.getCell('H12');
+                mergedCell.style = leftAlignedDataStyle;
 
               }
 
               if (key === '20mshuttleruns') {
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', '', `${getUnitForComponent(key)}`, score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A11:B11`);
                 worksheet.mergeCells(`C11:H11`);
@@ -280,38 +315,37 @@ const PhFitnessRecord: React.FC = () => {
               const score = calculateScore(key, student.gender, firstTry, secondTry);
               totalScore += score;
            
-              worksheet.addRow([componentOrder[key],'','', '1:', firstTry, getUnitForComponent(key), '2:', secondTry, getUnitForComponent(key), score]).eachCell((cell) => {
-                cell.style = dataStyle;
-               });
+              const row = worksheet.addRow([componentOrder[key],'','', '1:', firstTry, getUnitForComponent(key), '2:', secondTry, getUnitForComponent(key), score]);
+              row.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
+              });
+
               if (key === 'seatedtoetouch') {
                 worksheet.mergeCells(`A9:B9`);
-
               }
               if (key === 'sidesteps') {
                 worksheet.mergeCells(`A10:B10`);
-
               }
-
               if (key === 'longjump') {
                 worksheet.mergeCells(`A13:B13`);
-
               }
               if (key === 'softballthrowing') {
                 worksheet.mergeCells(`A14:B14`);
-
               }
             }
       });
 
       // Total Score and Grade
       const grade = determineGrade(totalScore, student.class);
-      worksheet.addRow(['Total Score', '', '','','','','','','',totalScore]).eachCell((cell) => {
-          cell.style = dataStyle;
+      const totalRow = worksheet.addRow(['Total Score', '', '','','','','','','',totalScore]);
+      totalRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
       worksheet.mergeCells(`A15:I15`);
 
-      worksheet.addRow(['Grade', '', '','','','','','','',grade]).eachCell((cell) => {
-          cell.style = dataStyle;
+      const gradeRow = worksheet.addRow(['Grade', '', '','','','','','','',grade]);
+      gradeRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
       worksheet.mergeCells(`A16:I16`);
 
@@ -332,12 +366,15 @@ const PhFitnessRecord: React.FC = () => {
 
 function setManualColumnWidths(worksheet: ExcelJS.Worksheet): void {
   // Manually setting each column width
-  worksheet.getColumn('A').width = 12.11;
+  // worksheet.getColumn('A').width = 12.11;
+  worksheet.getColumn('A').width = 13.5;
   worksheet.getColumn('B').width = 7.67;
-  worksheet.getColumn('C').width = 5.44;
+  // worksheet.getColumn('C').width = 5.44;
+  worksheet.getColumn('C').width = 6;
   worksheet.getColumn('D').width = 4.22;
   worksheet.getColumn('E').width = 6.78;
-  worksheet.getColumn('F').width = 6.22;
+  // worksheet.getColumn('F').width = 6.22;
+  worksheet.getColumn('F').width = 7.5;
   worksheet.getColumn('G').width = 4.00;
   worksheet.getColumn('H').width = 8;
   worksheet.getColumn('I').width = 15;
@@ -378,6 +415,31 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
       }
   };
 
+  // Create a left-aligned version of dataStyle for columns C and I
+  const leftAlignedDataStyle: Partial<ExcelJS.Style> = {
+    font: { size: 14 },
+    alignment: {
+        horizontal: 'left' as 'left',      // Left aligned instead of center
+        vertical: 'middle' as 'middle',
+        wrapText: true
+    },
+    border: {
+        top: { style: 'thin' as 'thin' },
+        left: { style: 'thin' as 'thin' },
+        bottom: { style: 'thin' as 'thin' },
+        right: { style: 'thin' as 'thin' }
+    }
+  };
+
+  // Helper function to apply style based on column
+  function applyStyleToCell(cell: ExcelJS.Cell, colNumber: number) {
+    if (colNumber === 6 || colNumber === 9) { // Column C = 3, Column I = 9
+      cell.style = leftAlignedDataStyle;
+    } else {
+      cell.style = dataStyle;
+    }
+  }
+
       // Header row
       const headerRow = worksheet.getCell('A2');
       headerRow.value = `Grade`;
@@ -414,8 +476,9 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
 
       // Column headers
       worksheet.addRow(['', '', '']);
-      worksheet.addRow(['Component', '', 'Record', '','','','','','','Score']).eachCell((cell) => {
-          cell.style = dataStyle;
+      const columnHeaderRow = worksheet.addRow(['Component', '', 'Record', '','','','','','','Score']);
+      columnHeaderRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
 
       worksheet.mergeCells(`A4:B4`);
@@ -434,15 +497,21 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
               const score = calculateScore("gripStrength", student.gender, maxGripStrength, 0);
               totalScore += score;
 
-              worksheet.addRow(['Grip Strength','','R', '1:', `${firstTryR}`, 'kg', '2:',`${secondTryR}`, 'kg', score]).eachCell((cell) => {
-                  cell.style = dataStyle;
+              const gripRow1 = worksheet.addRow(['Grip Strength','','R', '1:', `${firstTryR}`, 'kg', '2:',`${secondTryR}`, 'kg', score]);
+              gripRow1.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
-              worksheet.addRow(['Grip Strength','','L', '1:', `${firstTryL}`, 'kg', '2:',`${secondTryL}`, 'kg', score]).eachCell((cell) => {
-                  cell.style = dataStyle;
+
+              const gripRow2 = worksheet.addRow(['Grip Strength','','L', '1:', `${firstTryL}`, 'kg', '2:',`${secondTryL}`, 'kg', score]);
+              gripRow2.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
-              worksheet.addRow(['','','Avg: ', `${maxGripStrength}`,'','','','','kg', '']).eachCell((cell) => {
-                  cell.style = dataStyle;
+
+              const gripRow3 = worksheet.addRow(['','','Avg: ', `${maxGripStrength}`,'','','','','kg', '']);
+              gripRow3.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
               });
+
               worksheet.mergeCells(`A5:B7`);
               worksheet.mergeCells(`D7:H7`);
               worksheet.mergeCells(`J5:J7`);
@@ -455,29 +524,32 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
 
 
               if (key === 'situps') {
-
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', '', `${getUnitForComponent(key)}`, score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A8:B8`);
                 worksheet.mergeCells(`C8:H8`);
               }
               if (key === '50msprint') {
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', `${getUnitForComponent(key)}`, '', score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A12:B12`);
                 worksheet.mergeCells(`C12:G12`);
                 worksheet.mergeCells(`H12:I12`);
+                
+                // Apply left alignment to the merged H12:I12 cell
+                const mergedCell = worksheet.getCell('H12');
+                mergedCell.style = leftAlignedDataStyle;
 
               }
 
               if (key === '20mshuttleruns') {
                 const row = worksheet.addRow([componentOrder[key], '', `${firstTry}`, '', '', '', '', '', `${getUnitForComponent(key)}`, score]);
-                row.eachCell((cell) => {
-                  cell.style = dataStyle;
+                row.eachCell((cell, colNumber) => {
+                  applyStyleToCell(cell, colNumber);
                 });
                 worksheet.mergeCells(`A11:B11`);
                 worksheet.mergeCells(`C11:H11`);
@@ -489,38 +561,37 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
               const score = calculateScore(key, student.gender, firstTry, secondTry);
               totalScore += score;
            
-              worksheet.addRow([componentOrder[key],'','', '1:', firstTry, getUnitForComponent(key), '2:', secondTry, getUnitForComponent(key), score]).eachCell((cell) => {
-                cell.style = dataStyle;
-               });
+              const row = worksheet.addRow([componentOrder[key],'','', '1:', firstTry, getUnitForComponent(key), '2:', secondTry, getUnitForComponent(key), score]);
+              row.eachCell((cell, colNumber) => {
+                applyStyleToCell(cell, colNumber);
+              });
+
               if (key === 'seatedtoetouch') {
                 worksheet.mergeCells(`A9:B9`);
-
               }
               if (key === 'sidesteps') {
                 worksheet.mergeCells(`A10:B10`);
-
               }
-
               if (key === 'longjump') {
                 worksheet.mergeCells(`A13:B13`);
-
               }
               if (key === 'softballthrowing') {
                 worksheet.mergeCells(`A14:B14`);
-
               }
             }
       });
 
       // Total Score and Grade
       const grade = determineGrade(totalScore, student.class);
-      worksheet.addRow(['Total Score', '', '','','','','','','',totalScore]).eachCell((cell) => {
-          cell.style = dataStyle;
+      const totalRow = worksheet.addRow(['Total Score', '', '','','','','','','',totalScore]);
+      totalRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
       worksheet.mergeCells(`A15:I15`);
 
-      worksheet.addRow(['Grade', '', '','','','','','','',grade]).eachCell((cell) => {
-          cell.style = dataStyle;
+      const gradeRow = worksheet.addRow(['Grade', '', '','','','','','','',grade]);
+      gradeRow.eachCell((cell, colNumber) => {
+        applyStyleToCell(cell, colNumber);
       });
       worksheet.mergeCells(`A16:I16`);
 
