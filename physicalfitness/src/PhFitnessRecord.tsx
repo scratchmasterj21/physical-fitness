@@ -195,6 +195,11 @@ const exportGradeToIndividualWorkbooks = async (students: Student[], selectedGra
   }
 
       // Header row
+      const headerRow0 = worksheet.getCell('A1');
+      headerRow0.value = `Physical Fitness Test Results`;
+      headerRow0.style = headerStyle;
+      worksheet.mergeCells(`A1:J1`);
+      
       const headerRow = worksheet.getCell('A2');
       headerRow.value = `Grade`;
       headerRow.style = headerStyle;
@@ -441,6 +446,11 @@ const exportGradeToSingleWorkbook = async (students: Student[], selectedGrade: s
   }
 
       // Header row
+      const headerRow0 = worksheet.getCell('A1');
+      headerRow0.value = `Physical Fitness Test Results`;
+      headerRow0.style = headerStyle;
+      worksheet.mergeCells(`A1:J1`);
+
       const headerRow = worksheet.getCell('A2');
       headerRow.value = `Grade`;
       headerRow.style = headerStyle;
