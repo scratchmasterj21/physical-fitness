@@ -17,7 +17,7 @@ interface Student {
 }
 
 interface ComponentOrder {
-  [key: string]: string;
+  [key:string]: string;
 }
 
 const PhFitnessRecord: React.FC = () => {
@@ -33,15 +33,11 @@ const PhFitnessRecord: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  const prevSchoolYear = useRef<string>(selectedSchoolYear);
-  const prevGrade = useRef<string>(selectedGrade);
-
-  // Add initial load effect
+  // This effect loads static data (school years and grades) once on component mount.
   useEffect(() => {
     const db = getDatabase(app);
     const yearRef = ref(db, 'schoolyear');
     const gradeRef = ref(db, 'grade');
-    const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
 
     // Load school years
     onValue(yearRef, (snapshot) => {
@@ -58,10 +54,18 @@ const PhFitnessRecord: React.FC = () => {
         setGrades(Object.values(data));
       }
     });
+  }, []); // Empty dependency array means this runs only once.
 
-    // Load initial students
-    onValue(studentsRef, (snapshot) => {
+  // This effect is the key to fixing the concurrency issue.
+  // It fetches student data for the selected class and correctly manages the listener.
+  useEffect(() => {
+    const db = getDatabase(app);
+    const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
+
+    // onValue returns an 'unsubscribe' function which we'll use for cleanup.
+    const unsubscribe = onValue(studentsRef, (snapshot) => {
       const data = snapshot.val();
+      const studentList: Student[] = [];
       if (data) {
         const sortedStudents = Object.entries(data)
           .sort(([key1], [key2]) => {
@@ -70,44 +74,23 @@ const PhFitnessRecord: React.FC = () => {
             return num1 - num2;
           })
           .map(([, studentData]) => studentData as Student);
-        setStudents(sortedStudents);
-      } else {
-        setStudents([]);
+        studentList.push(...sortedStudents);
       }
+      setStudents(studentList);
+      // When the class changes, reset the view to the student list.
+      setCurrentStudentIndex(null);
+      setHasUnsavedChanges(false);
+      setLastSavedTime(null);
+      setSearchTerm('');
     });
 
-    // Cleanup function
+    // This cleanup function is called by React before the effect re-runs or when the component unmounts.
+    // It detaches the listener from the PREVIOUS grade's data path, preventing cross-talk between users.
     return () => {
-      // No need to manually unsubscribe as onValue handles cleanup
+      unsubscribe();
     };
-  }, []); // Empty dependency array means this runs once on mount
+  }, [selectedSchoolYear, selectedGrade]); // Re-run this effect whenever the school year or grade changes.
 
-  // Keep the existing effect for when school year or grade changes
-  useEffect(() => {
-    if (prevSchoolYear.current !== selectedSchoolYear || prevGrade.current !== selectedGrade) {
-    const db = getDatabase(app);
-      const studentsRef = ref(db, `${selectedSchoolYear}/${selectedGrade}`);
-  
-      onValue(studentsRef, (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-          const sortedStudents = Object.entries(data)
-            .sort(([key1], [key2]) => {
-              const num1 = parseInt(key1.match(/\d+$/)?.[0] || '0', 10);
-              const num2 = parseInt(key2.match(/\d+$/)?.[0] || '0', 10);
-              return num1 - num2;
-            })
-            .map(([, studentData]) => studentData as Student);
-          setStudents(sortedStudents);
-        } else {
-          setStudents([]);
-        }
-      });
-  
-      prevSchoolYear.current = selectedSchoolYear;
-      prevGrade.current = selectedGrade;
-    }
-  }, [selectedSchoolYear, selectedGrade]);
 
   // Add keyboard navigation
   useEffect(() => {
@@ -131,6 +114,24 @@ const PhFitnessRecord: React.FC = () => {
       firstInputRef.current.focus();
     }
   }, [currentStudentIndex]);
+
+    // Handlers for dropdowns to prevent losing unsaved data
+    const handleSchoolYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (hasUnsavedChanges && !window.confirm('You have unsaved changes that will be lost. Are you sure you want to switch?')) {
+            // If the user clicks "Cancel", we do nothing, keeping the old selection.
+            e.target.value = selectedSchoolYear; // Revert visual change if necessary
+            return;
+        }
+        setSelectedSchoolYear(e.target.value);
+    };
+
+    const handleGradeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        if (hasUnsavedChanges && !window.confirm('You have unsaved changes that will be lost. Are you sure you want to switch?')) {
+            e.target.value = selectedGrade; // Revert visual change if necessary
+            return;
+        }
+        setSelectedGrade(e.target.value);
+    };
 
 const exportGradeToIndividualWorkbooks = async (students: Student[], selectedGrade: string) => {
     const zip = new JSZip(); // Create a new instance of JSZip
@@ -1192,7 +1193,7 @@ const renderStudentList = () => (
             <select
               className="form-select block mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               value={selectedSchoolYear}
-              onChange={(e) => setSelectedSchoolYear(e.target.value)}
+              onChange={handleSchoolYearChange}
             >
               {schoolYears.map((year, idx) => (
                 <option key={idx} value={year}>{year}</option>
@@ -1205,7 +1206,7 @@ const renderStudentList = () => (
             <select
               className="form-select block mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
               value={selectedGrade}
-              onChange={(e) => setSelectedGrade(e.target.value)}
+              onChange={handleGradeChange}
             >
               {grades.map((grade, idx) => (
                 <option key={idx} value={grade}>{grade}</option>
