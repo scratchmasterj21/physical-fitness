@@ -1041,30 +1041,30 @@ const saveCurrentStudent = async () => {
   }
 };
 
-const saveAllChanges = async () => {
-  if (!hasUnsavedChanges) return;
+// const saveAllChanges = async () => {
+//   if (!hasUnsavedChanges) return;
   
-  setIsSaving(true);
-  const db = getDatabase(app);
+//   setIsSaving(true);
+//   const db = getDatabase(app);
   
-  try {
-    const updates = students.reduce((acc, student, index) => {
-      acc[`${selectedSchoolYear}/${selectedGrade}/student${index + 1}`] = {
-        '1sttry': student['1sttry'],
-        '2ndtry': student['2ndtry'],
-      };
-      return acc;
-    }, {} as Record<string, any>);
-    
-    await update(ref(db), updates);
-    setHasUnsavedChanges(false);
-  } catch (error) {
-    console.error('Error saving all student data:', error);
-    // You might want to show an error message to the user here
-  } finally {
-    setIsSaving(false);
-  }
-};
+//   try {
+//     const updates = students.reduce((acc, student, index) => {
+//       acc[`${selectedSchoolYear}/${selectedGrade}/student${index + 1}`] = {
+//         '1sttry': student['1sttry'],
+//         '2ndtry': student['2ndtry'],
+//       };
+//       return acc;
+//     }, {} as Record<string, any>);
+  
+//     await update(ref(db), updates);
+//     setHasUnsavedChanges(false);
+//   } catch (error) {
+//     console.error('Error saving all student data:', error);
+//     // You might want to show an error message to the user here
+//   } finally {
+//     setIsSaving(false);
+//   }
+// };
 
 const renderEditView = (student: Student) => {
   if (!student) return null;
@@ -1228,15 +1228,15 @@ const renderStudentList = () => (
           >
             Export to Excel
               </button>
-          {hasUnsavedChanges && currentStudentIndex !== null && (
+            {/* {hasUnsavedChanges && currentStudentIndex !== null && (
             <button 
               className="btn btn-primary bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200" 
               onClick={saveAllChanges}
               disabled={isSaving}
             >
               {isSaving ? 'Saving...' : 'Save All Changes'}
-              </button>
-              )}      
+            </button>
+            )}       */}
             </div>
       </div>
 
